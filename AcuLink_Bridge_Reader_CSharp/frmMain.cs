@@ -78,6 +78,7 @@ namespace AcuLink_Bridge_Reader_CSharp
         bool backgroundWorkerRestart;
         private bool IsAutoRestarting;
         char padZeroChar = '0';
+        string paddedTemp;
         
         PacketCommunicator communicator;
         
@@ -650,6 +651,15 @@ namespace AcuLink_Bridge_Reader_CSharp
 
                                             server.Send(Encoding.ASCII.GetBytes("user " + Properties.Settings.Default.cwRegNum + " pass -1 vers Kevin's Acu-Rapid\r\n"));
 
+                                            if (temperature <= -1 && temperature >= -9)
+                                            {
+                                                paddedTemp = "-0" + Math.Round(Math.Abs(temperature), 0).ToString();
+                                            }
+                                            else
+                                            {
+                                                paddedTemp = Math.Round(temperature, 0).ToString().PadLeft(3, padZeroChar);
+                                            }
+
                                             string CWOPUpdateString = Properties.Settings.Default.cwRegNum + ">APRS,TCPIP*:@" +
                                                 DateTime.Now.ToUniversalTime().Day.ToString().PadLeft(2, padZeroChar) +
                                                 DateTime.Now.ToUniversalTime().Hour.ToString().PadLeft(2, padZeroChar) +
@@ -658,8 +668,8 @@ namespace AcuLink_Bridge_Reader_CSharp
                                                 "/" + Properties.Settings.Default.cwLon + 
                                                 "_" + Math.Round(windDegrees, 0).ToString().PadLeft(3, padZeroChar) +
                                                 "/" + Math.Round(windspeed, 0).ToString().PadLeft(3, padZeroChar) + 
-                                                "g" + Math.Round(windGust, 0).ToString().PadLeft(3, padZeroChar) + 
-                                                "t" + Math.Round(temperature, 0).ToString().PadLeft(3, padZeroChar) + 
+                                                "g" + Math.Round(windGust, 0).ToString().PadLeft(3, padZeroChar) +
+                                                "t" + paddedTemp + 
                                                 "r" + Math.Round(rainHour * 100, 0).ToString().PadLeft(3, padZeroChar) + 
                                                 "p" + Math.Round(rain24Hours * 100, 0).ToString().PadLeft(3, padZeroChar) + 
                                                 "P" + Math.Round(cumulRainDay * 100, 0).ToString().PadLeft(3, padZeroChar) +
@@ -1058,7 +1068,7 @@ namespace AcuLink_Bridge_Reader_CSharp
         private void AboutToolStripMenuItem_Click_1(object sender, EventArgs e)
         {
             MessageBox.Show("Kevin's Acu-Link Bridge to Weather Underground Rapid Fire and More" + System.Environment.NewLine + "Version: " +
-                "2014.10.22.2117" + System.Environment.NewLine + "© 2015  Kevin Key" +
+                "2015.3.2.2008" + System.Environment.NewLine + "© 2015  Kevin Key" +
                 System.Environment.NewLine + "Comments/suggestions: kevinkey@gmail.com" + System.Environment.NewLine + "http://kevin-key.blogspot.com/");
             }
 
