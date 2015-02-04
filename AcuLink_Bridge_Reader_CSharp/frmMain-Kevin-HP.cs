@@ -8,7 +8,6 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using System.Net;
-using System.Net.Sockets;
 using System.Globalization;
 using System.Configuration;
 using System.Diagnostics;
@@ -18,33 +17,27 @@ using System.Text.RegularExpressions;
 using System.Threading;
 using System.IO;
 using System.Reflection;
-using System.Web;
 
 namespace AcuLink_Bridge_Reader_CSharp
 {
     public partial class frmMain : Form
     {
         DataTable dtRainData = new DataTable();
-        //List<RainData> rainHistory = new List<RainData>();
         double previousRainReading = 0;
         double cumulRainDay = 0;
-        //double cumulRainNoReset = 0;
+        double cumulRainNoReset = 0;
         double rainHour = 0;
-        double rain24Hours = 0;
-        //List<WindData> windHistory = new List<WindData>();
         DataTable dtWindData = new DataTable();
         int previousDay = DateTime.Now.Day;
         string waitMessage = "Waiting for bridge data. If this takes more than 5 minutes, please check whether the correct network device is selected.";
         int noSensorDataIterations = 0;
-        decimal windGust;
+        double windGust;
         double dewpoint;
         string windDirHex;
         double windDegrees;
-        decimal windspeed;
-        decimal temperature;
-        decimal soilTemperature;
-        decimal humidity;
-        decimal soilHumidity;
+        double windspeed;
+        double temperature;
+        double humidity;
         double pressure;
         double currRain;
         int signal;
@@ -75,15 +68,13 @@ namespace AcuLink_Bridge_Reader_CSharp
         string sensorType;
         int skipUpdateInterval = 33;
         int skipUpdateCount = 0;
-        bool backgroundWorkerRestart;
-        private bool IsAutoRestarting;
-        char padZeroChar = '0';
-        
+
         PacketCommunicator communicator;
-        
+
         // Callback function invoked by Pcap.Net for every incoming packet
         private void PacketHandler(Packet packet)
         {
+
             if (!BackgroundWorker1.CancellationPending == true)
             {
                 try
@@ -110,9 +101,6 @@ namespace AcuLink_Bridge_Reader_CSharp
                         
                         string[] bridgeDataArray;
                         double pressureOffset = Properties.Settings.Default.pressureOffset;
-                        decimal tempOffset = Properties.Settings.Default.tempOffset;
-                        decimal soilTempOffset = Properties.Settings.Default.soilTempOffset;
-                        decimal windOffsetPct = Properties.Settings.Default.windOffsetPct;
 
                         if (match.Success)
                         {
@@ -209,66 +197,36 @@ namespace AcuLink_Bridge_Reader_CSharp
                                         && (Properties.Settings.Default.sensorTypeWind == "" || sensorType.IndexOf(Properties.Settings.Default.sensorTypeWind) != -1)
                                         && (Properties.Settings.Default.sensorIdWind == "" || sensorId.IndexOf(Properties.Settings.Default.sensorIdWind) != -1))
                                     {
-                                        windspeed = Math.Round(decimal.Parse(element.Substring(11, 5)) / 44.70400004m * windOffsetPct / 100, 1);
+                                        windspeed = Math.Round(double.Parse(element.Substring(11, 5)) / 44.70400004, 1);
 
-                                        //windHistory.Add(new WindData(DateTime.Now, windspeed));
                                         dtWindData.Rows.Add(new object[] {
-                                            DateTime.Now,
-                                            windspeed
-                                        });
+								        DateTime.Now,
+								        windspeed
+							        });
 
                                         windGust = calcWindGust(windspeed);
                                     }
 
-                                    if (element.IndexOf("temperature=") == 0)
+                                    if (element.IndexOf("temperature=") == 0 
+                                        && (Properties.Settings.Default.sensorTypeTemp == "" || sensorType.IndexOf(Properties.Settings.Default.sensorTypeTemp) != -1)
+                                        && (Properties.Settings.Default.sensorIdTemp == "" || sensorId.IndexOf(Properties.Settings.Default.sensorIdTemp) != -1))
                                     {
-                                        if ((Properties.Settings.Default.sensorTypeTemp == "" || sensorType.IndexOf(Properties.Settings.Default.sensorTypeTemp) != -1)
-                                            && (Properties.Settings.Default.sensorIdTemp == "" || sensorId.IndexOf(Properties.Settings.Default.sensorIdTemp) != -1))
+                                        if (element.Substring(13, 1) == "-")
                                         {
-                                            if (element.Substring(13, 1) == "-")
-                                            {
-                                                temperature = Math.Round(decimal.Parse(element.Substring(14, 4)) * -1 / 100 * 9 / 5 + 32, 1) + tempOffset;
-                                            }
-                                            else
-                                            {
-                                                temperature = Math.Round(decimal.Parse(element.Substring(14, 4)) / 100 * 9 / 5 + 32, 1) + tempOffset;
-                                            }
+                                            temperature = Math.Round(double.Parse(element.Substring(14, 4)) * -1 / 100 * 9 / 5 + 32, 1);
                                         }
-
-                                        if (Properties.Settings.Default.sensorTypeSoil.Length > 0 || Properties.Settings.Default.sensorIdSoil.Length > 0)
+                                        else
                                         {
-                                            if ((Properties.Settings.Default.sensorTypeSoil == "" || sensorType.IndexOf(Properties.Settings.Default.sensorTypeSoil) != -1)
-                                                && (Properties.Settings.Default.sensorIdSoil == "" || sensorId.IndexOf(Properties.Settings.Default.sensorIdSoil) != -1))
-                                            {
-                                                if (element.Substring(13, 1) == "-")
-                                                {
-                                                    soilTemperature = Math.Round(decimal.Parse(element.Substring(14, 4)) * -1 / 100 * 9 / 5 + 32, 1) + soilTempOffset;
-                                                }
-                                                else
-                                                {
-                                                    soilTemperature = Math.Round(decimal.Parse(element.Substring(14, 4)) / 100 * 9 / 5 + 32, 1) + soilTempOffset;
-                                                }
-                                            }
+                                            temperature = Math.Round(double.Parse(element.Substring(14, 4)) / 100 * 9 / 5 + 32, 1);
                                         }
 
                                     }
 
-                                    if (element.IndexOf("humidity=") == 0) 
+                                    if (element.IndexOf("humidity=") == 0
+                                        && (Properties.Settings.Default.sensorTypeHumidity == "" || sensorType.IndexOf(Properties.Settings.Default.sensorTypeHumidity) != -1)
+                                        && (Properties.Settings.Default.sensorIdHumidity == "" || sensorId.IndexOf(Properties.Settings.Default.sensorIdHumidity) != -1))
                                     {
-                                        if((Properties.Settings.Default.sensorTypeHumidity == "" || sensorType.IndexOf(Properties.Settings.Default.sensorTypeHumidity) != -1)
-                                            && (Properties.Settings.Default.sensorIdHumidity == "" || sensorId.IndexOf(Properties.Settings.Default.sensorIdHumidity) != -1))
-                                        {
-                                            humidity = decimal.Parse(element.Substring(11, 3)) / 10;
-                                        }                            
-        
-                                        if (Properties.Settings.Default.sensorTypeSoil.Length > 0 || Properties.Settings.Default.sensorIdSoil.Length > 0)
-                                        {
-                                            if ((Properties.Settings.Default.sensorTypeSoil == "" || sensorType.IndexOf(Properties.Settings.Default.sensorTypeSoil) != -1)
-                                                && (Properties.Settings.Default.sensorIdSoil == "" || sensorId.IndexOf(Properties.Settings.Default.sensorIdSoil) != -1))
-                                            {
-                                                soilHumidity = decimal.Parse(element.Substring(11, 3)) / 10;
-                                            }
-                                        }                                    
+                                        humidity = double.Parse(element.Substring(11, 3)) / 10;
                                     }
 
                                     if (element.IndexOf("rainfall=") == 0
@@ -280,14 +238,12 @@ namespace AcuLink_Bridge_Reader_CSharp
                                         if (currRain > 0)
                                         {
                                             cumulRainDay += currRain;
-                                            //cumulRainNoReset += currRain;
+                                            cumulRainNoReset += currRain;
                                         }
 
-                                        //rainHistory.Add(new RainData(DateTime.Now, currRain));
                                         dtRainData.Rows.Add(new object[] { DateTime.Now, currRain });
 
-                                        rainHour = rainLast60Minutes();
-                                        rain24Hours = rainLast24Hours();
+                                        rainHour = rainLast60Minutes(currRain);
                                     }
 
                                     if (element.IndexOf("rssi=") == 0)
@@ -300,7 +256,8 @@ namespace AcuLink_Bridge_Reader_CSharp
                                         battery = element.Substring(8);
                                     }
                                 }
-                           
+
+                               
                                 // Get and process pressure data
                                 if (element.IndexOf("C1=") == 0)
                                 {
@@ -393,10 +350,9 @@ namespace AcuLink_Bridge_Reader_CSharp
                                 
                                 if (humidity > 0)
                                 {
-                                    dewpoint = ((((Convert.ToDouble(temperature) - 32) / 1.8) - (14.55 + 0.114 * ((Convert.ToDouble(temperature) - 32) / 1.8)) * 
-                                        (1 - (0.01 * Convert.ToDouble(humidity))) - Math.Pow(((2.5 + 0.007 * ((Convert.ToDouble(temperature) - 32) / 1.8)) * 
-                                        (1 - (0.01 * Convert.ToDouble(humidity)))), 3) - (15.9 + 0.117 * ((Convert.ToDouble(temperature) - 32) / 1.8)) *
-                                        Math.Pow((1 - (0.01 * Convert.ToDouble(humidity))), 14)) * 1.8) + 32;
+                                    dewpoint = ((((temperature - 32) / 1.8) - (14.55 + 0.114 * ((temperature - 32) / 1.8)) * (1 - (0.01 * humidity)) - Math.Pow(((2.5 + 0.007 *
+                                        ((temperature - 32) / 1.8)) * (1 - (0.01 * humidity))), 3) - (15.9 + 0.117 * ((temperature - 32) / 1.8)) *
+                                        Math.Pow((1 - (0.01 * humidity)), 14)) * 1.8) + 32;
                                     dewpoint = Math.Round(dewpoint, 1);
                                 }
 
@@ -404,15 +360,13 @@ namespace AcuLink_Bridge_Reader_CSharp
 
                             if (txtOutput.Text.Length > 50000)
                             {
-                                this.Invoke(new MethodInvoker(() => txtOutput.Text = ""));
+                                this.Invoke(new MethodInvoker(() => string.IsNullOrEmpty(txtOutput.Text)));
                             }
 
                             string wuResponse = null;
                             string wBugResponse = null;
                             string pwsResponse = null;
                             string aWeatherResponse = null;
-                            string openWeatherMapResponse = null;
-                            string CWOPResponse = null;
 
                             if (pressure > 0 & (humidity > 0 || Properties.Settings.Default.filterOnSensorId.ToString() == "water" && temperature > 0) & noSensorDataIterations < 5)
                             {
@@ -422,8 +376,8 @@ namespace AcuLink_Bridge_Reader_CSharp
                                         "&PASSWORD=" + System.Uri.EscapeUriString(Properties.Settings.Default.wuPwd) + "&dateutc=" +
                                         System.Uri.EscapeUriString(Convert.ToString(DateTime.Now.ToUniversalTime())) + "&winddir=" + windDegrees + "&windspeedmph=" + windspeed + "&tempf=" +
                                         temperature + "&rainin=" + rainHour + "&dailyrainin=" + cumulRainDay + "&baromin=" + pressure + "&dewptf=" + dewpoint + "&humidity=" + humidity +
-                                        "&softwaretype=" + "Kevins%20Acu-Rapid%514&action=updateraw&realtime=1&rtfreq=15" + "&windgustmph=" + windGust + "&indoortempf=" + temperature +
-                                        "&soiltempf=" + soilTemperature + "&soilmoisture=" + soilHumidity;
+                                        "&softwaretype=" + "Kevins%20Acu-Rapid%201217&action=updateraw&realtime=1&rtfreq=15" + "&windgustmph=" + windGust /*+ "&indoortempf=" + temperature +
+                                        "&soiltempf=" + temperature*/;
                                     try
                                     {
                                         HttpWebRequest request = (HttpWebRequest)WebRequest.Create(wundergroundUpdateString);
@@ -434,11 +388,6 @@ namespace AcuLink_Bridge_Reader_CSharp
 
                                         readStream.Close();
                                         response.Close();
-
-                                        if (Properties.Settings.Default.debugMode == true)
-                                        {
-                                            this.Invoke(new MethodInvoker(() => txtOutput.Text = "   String posted to Wunderground: " + wundergroundUpdateString + System.Environment.NewLine + txtOutput.Text));
-                                        }
 
                                         if (wuResponse.IndexOf("success") != -1)
                                         {
@@ -475,11 +424,6 @@ namespace AcuLink_Bridge_Reader_CSharp
                                         readStream.Close();
                                         response.Close();
 
-                                        if (Properties.Settings.Default.debugMode == true)
-                                        {
-                                            this.Invoke(new MethodInvoker(() => txtOutput.Text = "   String posted to WeatherBug: " + weatherBugUpdateString + System.Environment.NewLine + txtOutput.Text));
-                                        }
-
                                         if (wBugResponse == "Successfully Received QueryString Data")
                                         {
                                             wBugResponse = "ok";
@@ -506,6 +450,9 @@ namespace AcuLink_Bridge_Reader_CSharp
                                         "&windgustmph=" + windGust + "&tempf=" + temperature + "&rainin=" + rainHour + "&dailyrainin=" + cumulRainDay + "&baromin=" + pressure +
                                         "&dewptf=" + dewpoint + "&humidity=" + humidity + "&action=updateraw";
 
+                                    //this.Invoke(new MethodInvoker(() => txtOutput.Text = DateTime.Now + "\t" + pwsUpdateString +
+                                    //        System.Environment.NewLine + txtOutput.Text));
+
                                     try
                                     {
                                         HttpWebRequest request = (HttpWebRequest)WebRequest.Create(pwsUpdateString);
@@ -516,11 +463,6 @@ namespace AcuLink_Bridge_Reader_CSharp
 
                                         readStream.Close();
                                         response.Close();
-
-                                        if (Properties.Settings.Default.debugMode == true)
-                                        {
-                                            this.Invoke(new MethodInvoker(() => txtOutput.Text = "   String posted to PWSWeather: " + pwsUpdateString + System.Environment.NewLine + txtOutput.Text));
-                                        }
 
                                         if (pwsResponse.IndexOf("Data Logged and posted in METAR mirror") >= 0)
                                         {
@@ -563,14 +505,10 @@ namespace AcuLink_Bridge_Reader_CSharp
                                             readStream.Close();
                                             response.Close();
 
-                                            if (Properties.Settings.Default.debugMode == true)
-                                            {
-                                                this.Invoke(new MethodInvoker(() => txtOutput.Text = "   String posted to AWeather: " + aWeatherUpdateString + System.Environment.NewLine + txtOutput.Text));
-                                            }
-
                                             if (aWeatherResponse == "")
                                             {
                                                 aWeatherResponse = "ok";
+                                                //aWeatherResponse = aWeatherUpdateString;
                                             }
 
                                         }
@@ -589,112 +527,6 @@ namespace AcuLink_Bridge_Reader_CSharp
                                 else
                                 {
                                     aWeatherResponse = "off";
-                                }
-                                
-                                if (Properties.Settings.Default.postToOw == true)
-                                {
-                                    string openWeatherMapUpdateString = "http://openweathermap.org/data/post?user=" + Properties.Settings.Default.owUsername + "&password=" +
-                                        Properties.Settings.Default.owPwd  + "&lat=" + Properties.Settings.Default.owLat + "&long=" + Properties.Settings.Default.owLon +
-                                        "&alt=" + Properties.Settings.Default.owAlt + "&temp=" + Math.Round((temperature - 32) * 5/9,2) + "&humidity=" + humidity + "&wind_dir=" + windDegrees +
-                                        "&wind_speed=" + windspeed * Convert.ToDecimal(0.44704) + "&wind_gust=" + windGust * Convert.ToDecimal(0.44704) + "&pressure=" +
-                                        Math.Round(pressure * 33.8637526, 0) + "&rain_1h=" + rainHour * 25.4 + "&rain_today=" + cumulRainDay * 25.4 + "&name=" +
-                                        HttpUtility.UrlEncode(Properties.Settings.Default.owStationName);
-                                    
-                                    try
-                                    {
-                                        HttpWebRequest request = (HttpWebRequest)WebRequest.Create(openWeatherMapUpdateString);
-                                        HttpWebResponse response = (HttpWebResponse)request.GetResponse();
-                                        Stream receiveStream = response.GetResponseStream();
-                                        StreamReader readStream = new StreamReader(receiveStream, Encoding.UTF8);
-                                        openWeatherMapResponse = readStream.ReadToEnd();
-
-                                        readStream.Close();
-                                        response.Close();
-
-                                        if (Properties.Settings.Default.debugMode == true)
-                                        {
-                                            this.Invoke(new MethodInvoker(() => txtOutput.Text = "   String posted to OpenWeatherMap: " + openWeatherMapUpdateString + System.Environment.NewLine + txtOutput.Text));
-                                        }
-
-                                        if (openWeatherMapResponse.IndexOf("\"cod\":\"200\"", StringComparison.OrdinalIgnoreCase) > 0)
-                                        {
-                                            openWeatherMapResponse = "ok";
-                                        }
-                                    }
-                                    catch (Exception ex)
-                                    {
-                                        openWeatherMapResponse = "";
-                                        this.Invoke(new MethodInvoker(() => txtOutput.Text = DateTime.Now + "\t" + "ERROR posting data to OpenWeatherMap. " + ex.Message +
-                                            System.Environment.NewLine + txtOutput.Text));
-                                    }
-
-                                }
-                                else
-                                {
-                                    openWeatherMapResponse = "off";
-                                }
-
-                                if (Properties.Settings.Default.postToCw == true)
-                                {
-
-                                    if (skipUpdateCount == 0 || skipUpdateCount >= skipUpdateInterval)
-                                    {
-                                        skipUpdateCount = 0;
-
-                                        try
-                                        {
-                                            DnsEndPoint cwHost = new DnsEndPoint(Properties.Settings.Default.cwHostName, 23);
-                                            Socket server = new Socket(System.Net.Sockets.AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-
-                                            server.Connect(cwHost);
-
-                                            server.Send(Encoding.ASCII.GetBytes("user " + Properties.Settings.Default.cwRegNum + " pass -1 vers Kevin's Acu-Rapid\r\n"));
-
-                                            string CWOPUpdateString = Properties.Settings.Default.cwRegNum + ">APRS,TCPIP*:@" +
-                                                DateTime.Now.ToUniversalTime().Day.ToString().PadLeft(2, padZeroChar) +
-                                                DateTime.Now.ToUniversalTime().Hour.ToString().PadLeft(2, padZeroChar) +
-                                                DateTime.Now.ToUniversalTime().Minute.ToString().PadLeft(2, padZeroChar) + "z" + 
-                                                Properties.Settings.Default.cwLat +         
-                                                "/" + Properties.Settings.Default.cwLon + 
-                                                "_" + Math.Round(windDegrees, 0).ToString().PadLeft(3, padZeroChar) +
-                                                "/" + Math.Round(windspeed, 0).ToString().PadLeft(3, padZeroChar) + 
-                                                "g" + Math.Round(windGust, 0).ToString().PadLeft(3, padZeroChar) + 
-                                                "t" + Math.Round(temperature, 0).ToString().PadLeft(3, padZeroChar) + 
-                                                "r" + Math.Round(rainHour * 100, 0).ToString().PadLeft(3, padZeroChar) + 
-                                                "p" + Math.Round(rain24Hours * 100, 0).ToString().PadLeft(3, padZeroChar) + 
-                                                "P" + Math.Round(cumulRainDay * 100, 0).ToString().PadLeft(3, padZeroChar) +
-                                                "h" + Math.Round(humidity, 0).ToString().PadLeft(2, padZeroChar) +
-                                                "b" + Math.Round(pressure * 33.8637526 * 10, 0) + "\r\n";
-
-                                            server.Send(Encoding.ASCII.GetBytes(CWOPUpdateString));
-
-                                            server.Shutdown(SocketShutdown.Both);
-                                            server.Close();
-
-                                            CWOPResponse = "OK";
-
-                                            if (Properties.Settings.Default.debugMode == true)
-                                            {
-                                                this.Invoke(new MethodInvoker(() => txtOutput.Text = "   String posted to CWOP: " + CWOPUpdateString +
-                                                    System.Environment.NewLine + txtOutput.Text));
-                                            }
-
-                                        }
-                                        catch (Exception ex)
-                                        {
-                                            CWOPResponse = "";
-                                            this.Invoke(new MethodInvoker(() => txtOutput.Text = DateTime.Now + "\t" +   "ERROR posting data to CWOP. " + ex.Message +
-                                                System.Environment.NewLine + txtOutput.Text));
-                                        }
-                                    }
-                                    else
-                                    {
-                                        CWOPResponse = "wait " + skipUpdateCount.ToString();
-                                    }
-                                }
-                                else
-                                {
-                                    CWOPResponse = "off";
                                 }
                                 
                                 skipUpdateCount += 1;
@@ -732,15 +564,13 @@ namespace AcuLink_Bridge_Reader_CSharp
                                 wBugResponse = "Need more data";
                                 pwsResponse = "Need more data";
                                 aWeatherResponse = "Need more data";
-                                openWeatherMapResponse = "Need more data";
-                                CWOPResponse = "Need more data";
                             }
                             
                             this.Invoke(new MethodInvoker(() => txtOutput.Text = DateTime.Now + "   " + "T:" + temperature.ToString("F1") + "   " + "H:" + humidity + "   " + "W:" +
                                 windDegrees + "\t" + "WS:" + windspeed.ToString("F1") + "\t" + "Gust:" + windGust.ToString("F1") + "\t" + "RDAY:" + cumulRainDay.ToString("F2") +
                                 "  " + "RHR:" + rainHour.ToString("F2") + "   " + "BAR:" + pressure.ToString("F2") + "   " + "DEW:" + dewpoint.ToString("F1") + "   " + "SI: " + sensorId +
-                                "  ST: " + sensorType + "   " + "WU: " + wuResponse + "  " + "WB: " + wBugResponse + "  " + "PWS: " + pwsResponse + "  " + "AW: " + aWeatherResponse +
-                                "  " + "OW: " + openWeatherMapResponse + "  " + "CW: " + CWOPResponse + System.Environment.NewLine + txtOutput.Text));
+                                "  ST: " + sensorType + "   " + "WU: " + wuResponse + "  " + "WB: " + wBugResponse + "  " + "PWS: " + pwsResponse + "  " + "AW: " + aWeatherResponse + 
+                                System.Environment.NewLine + txtOutput.Text));
                                                         
                             this.Invoke(new MethodInvoker(() => txtBattery.Text = battery));
 
@@ -792,10 +622,6 @@ namespace AcuLink_Bridge_Reader_CSharp
                             }
 
                             this.Invoke(new MethodInvoker(() => txtSignalFails.Text = signalFails.ToString()));
-
-                            Properties.Settings.Default.rainDay = cumulRainDay;
-                            Properties.Settings.Default.timestamp = DateTime.Now;
-                            Properties.Settings.Default.Save();
                         }
 
                     }
@@ -821,16 +647,8 @@ namespace AcuLink_Bridge_Reader_CSharp
 
         public frmMain()
         {
-            if (Process.GetProcessesByName(Process.GetCurrentProcess().ProcessName).Length > 1)
-            {
-                MessageBox.Show("The weather app is already running.");
-                Close();
-            }
-
             // This call is required by the designer.
             InitializeComponent();
-
-            BackgroundWorker1.RunWorkerCompleted += new RunWorkerCompletedEventHandler(HandleWorkerCompleted); // Must have this for the event to fire!
 
             // Add any initialization after the InitializeComponent() call.
             dtRainData.Columns.Add("time", typeof(DateTime));
@@ -840,15 +658,10 @@ namespace AcuLink_Bridge_Reader_CSharp
             dtWindData.Columns.Add("windSpeed", typeof(double));
 
             lblWuStationID.Text = Properties.Settings.Default.wuStation;
-            lblWbStationID.Text = Properties.Settings.Default.wbPub;
+            lblWbStationID.Text = Properties.Settings.Default.wbStation;
             lblPwsStationID.Text = Properties.Settings.Default.pwsStation;
             lblAweatherStationID.Text = Properties.Settings.Default.awStation;
-            lblOwmId.Text = Properties.Settings.Default.owStationName;
-            lblCwopId.Text = Properties.Settings.Default.cwRegNum;
 
-            // Load saved wind and rain history data
-            loadWindAndRainData();           
-  
             if (Properties.Settings.Default.networkDevice.Length > 0)
             {
                 txtOutput.Text = waitMessage;
@@ -858,114 +671,61 @@ namespace AcuLink_Bridge_Reader_CSharp
                 if (BackgroundWorker1.IsBusy == false)
                 {
                     BackgroundWorker1.RunWorkerAsync();
-                    timer1.Start();
                 }
             }
         }
 
-    
-        
 
-        private void HandleWorkerCompleted(object sender, RunWorkerCompletedEventArgs e)
+
+        private void BackgroundWorker1_RunWorkerCompleted(object sender, System.ComponentModel.RunWorkerCompletedEventArgs e)
         {
-            if (backgroundWorkerRestart == true)
+            pbarProgressBar1.Value = 0;
+
+            if (BackgroundWorker1.IsBusy == false)
             {
-                BackgroundWorker1.Dispose();
-
-                GC.Collect();
-
-                //this.Invoke(new MethodInvoker(() => txtOutput.Text = DateTime.Now + "\t" + "DEBUG: Resuming." + System.Environment.NewLine + txtOutput.Text));
+                txtOutput.Text = DateTime.Now + "\t" + "Attempting to resume operation. It may take a few minutes for the bridge to come back online..." +
+                    System.Environment.NewLine + txtOutput.Text;
+                pbarProgressBar1.Value = 5;
                 BackgroundWorker1.RunWorkerAsync();
             }
-
         }
 
-        //private void BackgroundWorker1_RunWorkerCompleted(object sender, System.ComponentModel.RunWorkerCompletedEventArgs e)
-        //{
-        //    MessageBox.Show("hello");
-        //    pbarProgressBar1.Value = 0;
-
-        //    if (BackgroundWorker1.IsBusy == false)
-        //    {
-        //        txtOutput.Text = DateTime.Now + "\t" + "Attempting to resume operation. It may take a few minutes for the bridge to come back online..." +
-        //            System.Environment.NewLine + txtOutput.Text;
-        //        pbarProgressBar1.Value = 5;
-        //        BackgroundWorker1.RunWorkerAsync();
-        //    }
-        //}
-
-        private decimal calcWindGust(decimal currentWindSpeed)
+        private double calcWindGust(double currentWindSpeed)
         {
-            //var windHistoryFiltered = windHistory.Where(WindData => WindData.time >= DateTime.Now.AddMinutes(-10));
-            //var windHistoryMax = windHistoryFiltered.OrderByDescending(WindData => WindData.windSpeed).First();
-            //decimal windGust = windHistoryMax.windSpeed;
-            //windHistory.RemoveAll(WindData => WindData.time < DateTime.Now.AddMinutes(-11));
-
             string expression = "time >= '" + DateTime.Now.AddMinutes(-10) + "'";
             string sortOrder = "windSpeed DESC";
             DataRow[] foundRows = null;
-            decimal windGust = 0;
+            double windGust = 0;
 
             // Use the Select method to find all rows matching the filter.
             foundRows = dtWindData.Select(expression, sortOrder);
-            windGust = decimal.Parse(foundRows[0][1].ToString());
+            windGust = double.Parse(foundRows[0][1].ToString());
 
-            // Delete rows older than 11 minutes
-            DataRow[] rows = dtWindData.Select("time <= '" + DateTime.Now.AddMinutes(-11) + "'");
+            // Delete rows older than one hour
+            dynamic rows = dtWindData.Select("time <= '" + DateTime.Now.AddHours(-1) + "'");
             foreach (DataRow row in rows)
             {
                 row.Delete();
             }
 
-            GC.Collect();
-
-            dtWindData.TableName = "kevin";
-            dtWindData.WriteXml("WindData.xml", true);
-            
             return windGust;
         }
 
-        private double rainLast60Minutes()
+        private double rainLast60Minutes(double rainNow)
         {
-            object rain;
-            rain = dtRainData.Compute("Sum(rain)", "time >= '" + DateTime.Now.AddMinutes(-60) + "'");
+            Object rain;
+            rain = dtRainData.Compute("Sum(rain)", "time >= '" + DateTime.Now.AddHours(-1) + "'");
+            //rain = dtRainData.Compute("Sum(rain)", "time >= '" + DateTime.Now.AddMinutes(-3) + "'");
 
-            // Delete rows older than 25 hours
-            DataRow[] rows = dtRainData.Select("time <= '" + DateTime.Now.AddHours(-25) + "'");
+            // Delete rows older than two hours
+            dynamic rows = dtRainData.Select("time <= '" + DateTime.Now.AddHours(-2) + "'");
             foreach (DataRow row in rows)
             {
                 row.Delete();
             }
 
-            GC.Collect();
-
-            dtRainData.TableName = "kevin";
-            dtRainData.WriteXml("RainData.xml", true);            
-
-            return Double.Parse(rain.ToString());
-            //return rainHistorySum;
-        }
-
-        private double rainLast24Hours()
-        {
-            object rain;
-            rain = dtRainData.Compute("Sum(rain)", "time >= '" + DateTime.Now.AddHours(-24) + "'");
- 
-            //// Delete rows older than 25 hours
-            //DataRow[] rows = dtRainData.Select("time <= '" + DateTime.Now.AddHours(-25) + "'");
-            //foreach (DataRow row in rows)
-            //{
-            //    row.Delete();
-            //}
-
-            //GC.Collect();
-
-            //dtRainData.TableName = "kevin";
-            //dtRainData.WriteXml("RainData.xml", true);
-
             return Double.Parse(rain.ToString());
         }
-
 
         public int progressBarValue(int pbarIncrement)
         {
@@ -985,8 +745,6 @@ namespace AcuLink_Bridge_Reader_CSharp
 
         private void btnStart_Click(object sender, EventArgs e)
         {
-            loadWindAndRainData();            
-
             if (Properties.Settings.Default.networkDevice.Length > 0)
             {
                 txtOutput.Text = waitMessage;
@@ -1001,7 +759,6 @@ namespace AcuLink_Bridge_Reader_CSharp
                 if (BackgroundWorker1.IsBusy == false)
                 {
                     BackgroundWorker1.RunWorkerAsync();
-                    timer1.Start();
                 }               
             }
             else
@@ -1029,8 +786,6 @@ namespace AcuLink_Bridge_Reader_CSharp
 
         private void btnStop_Click_1(object sender, EventArgs e)
         {
-            timer1.Stop();
-            backgroundWorkerRestart = false;
             BackgroundWorker1.CancelAsync();
             this.Invoke(new MethodInvoker(() => pbarProgressBar1.Value = 0));
             this.Invoke(new MethodInvoker(() => txtOutput.Text = txtOutput.Text.Replace(waitMessage, "")));
@@ -1041,25 +796,14 @@ namespace AcuLink_Bridge_Reader_CSharp
             txtBattery.Text = "";
             txtLastUpdated.Text = "";
             txtSignalFails.Text = "";
-            skipUpdateCount = 0;
-
-            dtRainData.Clear();
-            dtWindData.Clear();
-            dtRainData.Dispose();
-            dtWindData.Dispose();
-
-            BackgroundWorker1.Dispose();
-
-            GC.Collect();
-            
             this.Invoke(new MethodInvoker(() => txtOutput.Text = "Stopped." + System.Environment.NewLine + txtOutput.Text));
         }
 
         private void AboutToolStripMenuItem_Click_1(object sender, EventArgs e)
         {
             MessageBox.Show("Kevin's Acu-Link Bridge to Weather Underground Rapid Fire and More" + System.Environment.NewLine + "Version: " +
-                "2014.10.22.2117" + System.Environment.NewLine + "© 2015  Kevin Key" +
-                System.Environment.NewLine + "Comments/suggestions: kevinkey@gmail.com" + System.Environment.NewLine + "http://kevin-key.blogspot.com/");
+                Assembly.GetExecutingAssembly().GetName().Version.ToString() + System.Environment.NewLine + "© 2014  Kevin Key" +
+                System.Environment.NewLine + "Comments/suggestions: kevink619@ymail.com" + System.Environment.NewLine + "http://kevin-key.blogspot.com/");
             }
 
         private void AcuRiteSetupToolStripMenuItem_Click_1(object sender, EventArgs e)
@@ -1084,8 +828,8 @@ namespace AcuLink_Bridge_Reader_CSharp
         }
 
         private void BackgroundWorker1_DoWork_1(object sender, DoWorkEventArgs e)
-        {            
-             if (string.IsNullOrEmpty(Properties.Settings.Default.networkDevice))
+        {
+            if (string.IsNullOrEmpty(Properties.Settings.Default.networkDevice))
             {
                 BackgroundWorker1.Dispose();
                 pbarProgressBar1.Value = 0;
@@ -1121,7 +865,7 @@ namespace AcuLink_Bridge_Reader_CSharp
                     // portion of the packet to capture
                     // 65536 guarantees that the whole packet will be captured on all the link layers
                     // promiscuous mode
-                    using (communicator = selectedDevice.Open(1000, PacketDeviceOpenAttributes.NoCaptureLocal, 1000))
+                    using (communicator = selectedDevice.Open(65536, PacketDeviceOpenAttributes.NoCaptureLocal, 1000))
                     //using (PacketCommunicator communicator = selectedDevice.Open(65536, PacketDeviceOpenAttributes.Promiscuous, 1000))
                     {
                         // start the capture
@@ -1151,204 +895,15 @@ namespace AcuLink_Bridge_Reader_CSharp
             {
                 MessageBox.Show("ERROR: " + ex.Message);
                 Close();
-            }           
+            }                
 
         }
 
-        private void frmMain_Load_1(object sender, EventArgs e)
-        {
-            //notifyIcon1.ShowBalloonTip(1000);
-        }
-
-
-        private void loadWindAndRainData()
-        {            
-            if (File.Exists("WindData.xml"))
-            {
-
-                try
-                {
-                    DataSet theDataSetW = new DataSet();                
-                    theDataSetW.ReadXml("WindData.xml");
-
-                    foreach (DataRow row in theDataSetW.Tables[0].Rows)
-                    {
-                        DataRow workRow = dtWindData.NewRow();
-                        workRow["time"] = Convert.ToDateTime(row["time"]);
-                        workRow["windSpeed"] = Convert.ToDouble(row["windSpeed"]);
-                        dtWindData.Rows.Add(workRow);
-                    }
-
-                    windGust = calcWindGust(windspeed);
-                }
-
-                catch (Exception ex)
-                {
-                    AutoClosingMessageBox.Show("ERROR involving WindData.xml: " + ex.Message + "  This message will self-close in 10 seconds.", "ERROR", 10000);    
-                    //this.Invoke(new MethodInvoker(() => txtOutput.Text = DateTime.Now + "\t" + "ERROR involving WindData.xml: " + ex.Message + System.Environment.NewLine + 
-                    //    txtOutput.Text));
-                }
-            }
-
-            if (File.Exists("RainData.xml"))
-            {
-                try
-                {
-                    DataSet theDataSetR = new DataSet();
-                    theDataSetR.ReadXml("RainData.xml");
-
-                    foreach (DataRow row in theDataSetR.Tables[0].Rows)
-                    {
-                        DataRow workRow = dtRainData.NewRow();
-                        workRow["time"] = Convert.ToDateTime(row["time"]);
-                        workRow["rain"] = Convert.ToDouble(row["rain"]);
-                        dtRainData.Rows.Add(workRow);
-                    }
-
-                    rainHour = rainLast60Minutes();
-                    rain24Hours = rainLast24Hours();
-
-                }
-
-                catch (Exception ex)
-                {
-                    AutoClosingMessageBox.Show("ERROR involving RainData.xml: " + ex.Message + "  This message will self-close in 10 seconds.", "ERROR", 10000);                    
-                    //this.Invoke(new MethodInvoker(() => txtOutput.Text = DateTime.Now + "\t" + "ERROR involving RainData.xml: " + ex.Message + System.Environment.NewLine + 
-                    //    txtOutput.Text));
-                }
-            }
-
-            if (Properties.Settings.Default.timestamp.Date == DateTime.Now.Date)
-            {
-                cumulRainDay = Properties.Settings.Default.rainDay;
-            }
-        }
-        
-        protected override void OnFormClosing(FormClosingEventArgs e)
-        {
-            if (!this.IsAutoRestarting)
-            {
-                base.OnFormClosing(e);
-                if ((e.CloseReason != CloseReason.WindowsShutDown) && (MessageBox.Show(this, "Are you sure you want to exit the weather app?", "Closing", MessageBoxButtons.YesNo) == DialogResult.No))
-                {
-                    e.Cancel = true;
-                }
-            }
-        }
-
-        private void timer1_Tick_1(object sender, EventArgs e)
-        {
-            //if (Properties.Settings.Default.autoRestart)
-            //{
-            //    this.IsAutoRestarting = true;
-            //    Application.Restart();
-            //    this.IsAutoRestarting = false;
-            //}
-                        
-        }
-
-        private void notifyIcon1_MouseDoubleClick(object sender, MouseEventArgs e)
+        private void frmMain_Load(object sender, EventArgs e)
         {
 
         }
 
-        private void frmMain_Resize(object sender, EventArgs e)
-        {
-            if (FormWindowState.Minimized == this.WindowState)
-            {
-                notifyIcon1.Visible = true;
-                notifyIcon1.ShowBalloonTip(250);
-                this.ShowInTaskbar = false;
-                //this.ShowDialog();
-            }
-
-            else if (FormWindowState.Normal == this.WindowState)
-            {
-                notifyIcon1.Visible = false;
-                this.ShowInTaskbar = true;
-
-            }
-        }
-
-        private void notifyIcon1_MouseClick(object sender, MouseEventArgs e)
-        {
-            //this.WindowState = FormWindowState.Normal;
-            //notifyIcon1.Visible = false;
-            //this.ShowInTaskbar = true;
-        }
-
-        private void notifyIcon1_Click(object sender, EventArgs e)
-        {
-            //this.WindowState = FormWindowState.Normal;
-            //notifyIcon1.Visible = false;
-            //this.ShowInTaskbar = true;
-        }
-
-        private void notifyIcon1_MouseDown(object sender, MouseEventArgs e)
-        {
-            this.WindowState = FormWindowState.Normal;
-            notifyIcon1.Visible = false;
-            this.ShowInTaskbar = true;
-        }
-
-        private void exitToolStripMenuItem_Click(object sender, EventArgs e)
-        {
-            this.Close();
-        }
-                
-    }
-
-    public class WindData
-    {
-        public DateTime time { get; set; }
-        public decimal windSpeed { get; set; }
-
-        public WindData(DateTime time, decimal windSpeed) 
-        {
-            this.time = time;
-            this.windSpeed = windSpeed;
-        }
-    }
-
-    public class RainData
-    {
-        public DateTime time { get; set; }
-        public double rain { get; set; }
-
-        public RainData(DateTime time, double rain)
-        {
-            this.time = time;
-            this.rain = rain;
-        }
-    }
-
-    public class AutoClosingMessageBox
-    {
-        System.Threading.Timer _timeoutTimer;
-        string _caption;
-        AutoClosingMessageBox(string text, string caption, int timeout)
-        {
-            _caption = caption;
-            _timeoutTimer = new System.Threading.Timer(OnTimerElapsed,
-                null, timeout, System.Threading.Timeout.Infinite);
-            MessageBox.Show(text, caption);
-        }
-        public static void Show(string text, string caption, int timeout)
-        {
-            new AutoClosingMessageBox(text, caption, timeout);
-        }
-        void OnTimerElapsed(object state)
-        {
-            IntPtr mbWnd = FindWindow(null, _caption);
-            if (mbWnd != IntPtr.Zero)
-                SendMessage(mbWnd, WM_CLOSE, IntPtr.Zero, IntPtr.Zero);
-            _timeoutTimer.Dispose();
-        }
-        const int WM_CLOSE = 0x0010;
-        [System.Runtime.InteropServices.DllImport("user32.dll", SetLastError = true)]
-        static extern IntPtr FindWindow(string lpClassName, string lpWindowName);
-        [System.Runtime.InteropServices.DllImport("user32.dll", CharSet = System.Runtime.InteropServices.CharSet.Auto)]
-        static extern IntPtr SendMessage(IntPtr hWnd, UInt32 Msg, IntPtr wParam, IntPtr lParam);
     }
         
 }

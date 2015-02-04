@@ -76,12 +76,6 @@ namespace AcuLink_Bridge_Reader_CSharp
                 cmbSensorTypeRain.Items.Add("5n1");
                 cmbSensorTypeRain.Items.Add("3n1");
                 cmbSensorTypeRain.Items.Add("rain");
-
-                cmbSensorTypeSoil.Items.Add("");
-                cmbSensorTypeSoil.Items.Add("5n1");
-                cmbSensorTypeSoil.Items.Add("3n1");
-                cmbSensorTypeSoil.Items.Add("tower");
-                cmbSensorTypeSoil.Items.Add("water");
                 
                 // Add any initialization after the InitializeComponent() call.
                 txtWuID.Text = Properties.Settings.Default.wuStation;
@@ -111,25 +105,6 @@ namespace AcuLink_Bridge_Reader_CSharp
                 cmbSensorTypeTemperature.SelectedItem = Properties.Settings.Default.sensorTypeTemp;
                 cmbSensorTypeWind.SelectedItem = Properties.Settings.Default.sensorTypeWind;
                 txtCsvFilePath.Text = Properties.Settings.Default.csvFilePath;
-                txtTempOffset.Text = Properties.Settings.Default.tempOffset.ToString();
-                cbDebugMode.Checked = Properties.Settings.Default.debugMode;
-                cmbSensorTypeSoil.SelectedItem = Properties.Settings.Default.sensorTypeSoil;
-                txtSensorIdSoil.Text = Properties.Settings.Default.sensorIdSoil;
-                txtWindOffsetPct.Text = Properties.Settings.Default.windOffsetPct.ToString();
-                //cbAutoRestart.Checked = Properties.Settings.Default.autoRestart;
-                txtSoilTempOffset.Text = Properties.Settings.Default.soilTempOffset.ToString();
-                cbPostToOpenWeatherMap.Checked = Properties.Settings.Default.postToOw;
-                txtOwUsername.Text = Properties.Settings.Default.owUsername;
-                txtOwPwd.Text = Properties.Settings.Default.owPwd;
-                txtOwLat.Text = Properties.Settings.Default.owLat;
-                txtOwLon.Text = Properties.Settings.Default.owLon;
-                txtOwAlt.Text = Properties.Settings.Default.owAlt;
-                txtOwStationName.Text = Properties.Settings.Default.owStationName;
-                cbPostToCw.Checked = Properties.Settings.Default.postToCw;
-                txtCwRegNum.Text = Properties.Settings.Default.cwRegNum;
-                txtCwHostName.Text = Properties.Settings.Default.cwHostName;
-                txtCwLat.Text = Properties.Settings.Default.cwLat;
-                txtCwLon.Text = Properties.Settings.Default.cwLon;
             }
         }
 
@@ -151,34 +126,6 @@ namespace AcuLink_Bridge_Reader_CSharp
                 return;
             }
 
-            temp = 0;
-
-            if (!double.TryParse(txtTempOffset.Text, out temp))
-            {
-                MessageBox.Show("Please enter a Temperature Offset value between -9.99 and 9.99.");
-                txtTempOffset.Focus();
-                return;
-            }
-            else if (!(double.Parse(txtTempOffset.Text) >= -99.99) & double.Parse(txtTempOffset.Text) <= 99.99)
-            {
-                MessageBox.Show("Please enter a Temperature Offset value between -99.99 and 99.99.");
-                txtTempOffset.Focus();
-                return;
-            }
-
-            if (!double.TryParse(txtSoilTempOffset.Text, out temp))
-            {
-                MessageBox.Show("Please enter a Soil/Water Temperature Offset value between -99.99 and 99.99.");
-                txtSoilTempOffset.Focus();
-                return;
-            }
-            else if (!(double.Parse(txtSoilTempOffset.Text) >= -99.99) & double.Parse(txtSoilTempOffset.Text) <= 99.99)
-            {
-                MessageBox.Show("Please enter a Soil/Water Temperature Offset value between -99.99 and 99.99.");
-                txtSoilTempOffset.Focus();
-                return;
-            }
-
             var _with1 = Properties.Settings.Default;
             _with1.wuStation = txtWuID.Text.ToUpper();
             _with1.wuPwd = txtWuPwd.Text;
@@ -190,7 +137,6 @@ namespace AcuLink_Bridge_Reader_CSharp
             _with1.wbPwd = txtWbPassword.Text;
             _with1.wbStation = txtWbStationNum.Text;
             _with1.writeToCSV = cbWriteToCSV.Checked;
-            _with1.postToPws = cbPostToPWS.Checked;
             _with1.postToPws = cbPostToPWS.Checked;
             _with1.pwsStation = txtPwsStationId.Text;
             _with1.pwsPwd = txtPwsPassword.Text;
@@ -208,26 +154,7 @@ namespace AcuLink_Bridge_Reader_CSharp
             _with1.sensorTypeTemp = cmbSensorTypeTemperature.SelectedItem.ToString();
             _with1.sensorTypeWind = cmbSensorTypeWind.SelectedItem.ToString();
             _with1.csvFilePath = txtCsvFilePath.Text;
-            _with1.tempOffset = decimal.Parse(txtTempOffset.Text);
-            _with1.debugMode = cbDebugMode.Checked;
-            _with1.sensorTypeSoil = cmbSensorTypeSoil.SelectedItem.ToString();
-            _with1.sensorIdSoil = txtSensorIdSoil.Text;
-            _with1.windOffsetPct = decimal.Parse(this.txtWindOffsetPct.Text);
-            //_with1.autoRestart = this.cbAutoRestart.Checked;
-            _with1.soilTempOffset = decimal.Parse(txtSoilTempOffset.Text);
-            _with1.postToOw = cbPostToOpenWeatherMap.Checked;
-            _with1.owUsername = txtOwUsername.Text;
-            _with1.owPwd = txtOwPwd.Text;
-            _with1.owLat = txtOwLat.Text;
-            _with1.owLon = txtOwLon.Text;
-            _with1.owAlt = txtOwAlt.Text;
-            _with1.owStationName = txtOwStationName.Text;
-            _with1.postToCw = cbPostToCw.Checked;
-            _with1.cwRegNum = txtCwRegNum.Text;
-            _with1.cwHostName = txtCwHostName.Text;
-            _with1.cwLat = txtCwLat.Text;
-            _with1.cwLon = txtCwLon.Text;
-      
+
             Properties.Settings.Default.Save();
             
             this.Close();
@@ -238,12 +165,8 @@ namespace AcuLink_Bridge_Reader_CSharp
             Close();
         }
 
-        private void frmSetup_Load(object sender, EventArgs e)
-        {
-        }
 
+  
 
-
-   
     }
 }
